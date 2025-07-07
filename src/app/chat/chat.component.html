@@ -1,0 +1,179 @@
+<div class="border-x border-surface flex flex-col h-full max-h-screen border-0" style="padding: 0px;">
+    <!-- Header -->
+    <div class="flex items-center p-4 gap-7 border-b border-surface sticky top-0 bg-surface-0 z-10 border-0">
+        <div class="flex items-center">
+            <p-avatar image="/assets/just-logo.png" styleClass="mr-2 av" size="medium" shape="circle" />
+            <div class="flex-1">
+                <div class="text-color leading-6 hover:text-muted-color-emphasis transition-colors text-base">
+                    TalkVera
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Messages -->
+    <div #chatScroll class="flex-1 overflow-y-auto flex flex-col gap-8 py-8 px-6 bg-surface-0">
+        <div *ngFor="let message of _arrayModelFilteredMessage" class="flex items-start min-w-64 w-fit max-w-[60%]"
+            [ngClass]="{ 'ml-auto mr-0 flex-row-reverse': message.sender === _enumSender.User }">
+            <!-- Avatar + Tail -->
+            <div class="flex items-center gap-2 sticky top-0 transition-all"
+                [ngClass]="{ 'flex-row-reverse': message.sender === _enumSender.User }">
+                <img *ngIf="message.sender === _enumSender.User" src="/assets/user.png" alt="User Avatar"
+                    class="w-10 h-10 rounded-full" />
+                <img *ngIf="message.sender === _enumSender.Chatbot || message.sender === _enumSender.Admin"
+                    src="/assets/agent.png" alt="Agent Avatar" class="w-10 h-10 rounded-full" />
+                <svg [ngClass]="{
+                'fill-surface-100 dark:fill-surface-800': message.sender !== _enumSender.User,
+                'fill-primary rotate-180': message.sender === _enumSender.User
+            }" xmlns="http://www.w3.org/2000/svg" width="7" height="11" viewBox="0 0 7 11" fill="none">
+                    <path
+                        d="M1.79256 7.09551C0.516424 6.31565 0.516426 4.46224 1.79256 3.68238L7 0.500055L7 10.2778L1.79256 7.09551Z" />
+                </svg>
+            </div>
+
+            <!-- Bubble Content -->
+            <div [ngClass]="message.sender !== _enumSender.User
+            ? 'flex-1 bg-surface-100 dark:bg-surface-800 px-3 py-2 rounded-xl'
+            : 'flex-1 bg-primary px-3 py-2 rounded-xl text-primary-contrast'" class="flex flex-col gap-1">
+
+                <!-- TEXT -->
+                <p *ngIf="!message.fileName && !message.isVoiceNote && message.message"
+                    [ngClass]="message.sender !== _enumSender.User ? 'text-color leading-6 mb-0' : 'text-primary-contrast leading-6 mb-0'">
+                    {{ message.message }}
+                </p>
+
+                <!-- FILE -->
+                <div *ngIf="message.fileName && !message.isVoiceNote"
+                    class="flex items-center gap-3 p-3 rounded-lg bg-white/5 dark:bg-surface-50/10">
+                    <!-- Icon File -->
+                    <div
+                        class="w-10 h-10 min-w-10 min-h-10 rounded-md bg-surface-200 dark:bg-surface-100 flex items-center justify-center">
+                        <i class="pi pi-file-pdf text-xl"
+                            [ngClass]="message.sender === _enumSender.User ? 'text-primary-contrast' : 'text-surface-900'"></i>
+                    </div>
+
+                    <!-- File Info -->
+                    <div class="flex flex-col flex-1 overflow-hidden">
+                        <!-- File Name -->
+                        <a *ngIf="message.fileUrl" [href]="message.fileUrl" download="{{ message.fileName }}"
+                            target="_blank" class="text-sm font-medium truncate text-ellipsis"
+                            [title]="message.fileName"
+                            [ngClass]="message.sender === _enumSender.User ? 'text-primary-contrast underline' : 'text-color underline'">
+                            {{ truncateMiddle(message.fileName, 10) }}
+                        </a>
+
+                        <span *ngIf="!message.fileUrl" class="text-sm font-medium truncate"
+                            [ngClass]="message.sender === _enumSender.User ? 'text-primary-contrast' : 'text-color'">
+                            {{ truncateMiddle(message.fileName, 10) }}
+                        </span>
+
+                        <!-- File Size -->
+                        <span class="text-xs text-muted-color">
+                            {{ formatFileSize(message.fileSize || 0) }}
+                        </span>
+                    </div>
+
+                    <!-- Status Upload / Sent -->
+                    <div class="flex items-center">
+                        <!-- <ng-container *ngIf="!message.fileUrl">
+                            <i class="pi pi-spinner pi-spin text-muted-color text-sm"></i>
+                        </ng-container> -->
+                        <ng-container *ngIf="message.fileUrl">
+                            <i class="pi pi-check-circle"
+                                [ngClass]="message.sender === _enumSender.User ? 'text-primary-contrast' : 'text-success'"></i>
+                        </ng-container>
+                    </div>
+                </div>
+
+                <!-- VOICE NOTE -->
+                <div *ngIf="message.isVoiceNote" class="flex items-center gap-3 mt-1">
+
+                    <div class="flex flex-col text-sm min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-2">
+                        <span
+                            [ngClass]="message.sender === _enumSender.User ? 'text-primary-contrast font-medium' : 'text-color font-medium'">
+                            {{ truncateMiddle(message.fileName || 'voice-note.mp3', 15) }}
+                        </span>
+                        <span class="text-xs"
+                            [ngClass]="message.sender === _enumSender.User ? 'text-primary-contrast/70' : 'text-muted-color'">
+                            {{ message.audioDuration || '...' }}
+                        </span>
+                        </div>
+
+                        <!-- Audio Player or Uploading Info -->
+                        <ng-container *ngIf="message.audioUrl; else uploadingVoiceNote">
+                        <audio
+                            [src]="getSafeUrl(message.audioUrl)"
+                            controls
+                            class="w-full mt-1"
+                            style="max-width: 250px;">
+                        </audio>
+                        </ng-container>
+
+                        <ng-template #uploadingVoiceNote>
+                        <span class="text-xs italic text-orange-500 mt-1">🎙️ Uploading voice note...</span>
+                        </ng-template>
+                    </div>
+                </div>
+
+                <!-- TIME -->
+                <div class="text-xs mt-1 text-right"
+                    [ngClass]="message.sender !== _enumSender.User ? 'text-muted-color' : 'text-primary-contrast/70'">
+                    {{ formatMessageTime(message.time) }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Typing Loading -->
+        <div *ngIf="(chatCoreService.isLoadingSending$ | async)" class="flex items-start min-w-64 w-fit max-w-[30%]">
+            <div class="flex items-center gap-2">
+                <img src="/assets/agent.png" alt="Agent Avatar" class="w-10 h-10 rounded-full" />
+                <svg class="fill-surface-100 dark:fill-surface-800" xmlns="http://www.w3.org/2000/svg" width="7"
+                    height="11" viewBox="0 0 7 11" fill="none">
+                    <path
+                        d="M1.79256 7.09551C0.516424 6.31565 0.516426 4.46224 1.79256 3.68238L7 0.500055L7 10.2778L1.79256 7.09551Z" />
+                </svg>
+            </div>
+            <div class="flex-1 bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded-lg">
+                <div class="whatsapp-typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="p-4 border-t border-surface flex items-end justify-between gap-2 bg-surface-0">
+        <div class="flex items-end gap-1 flex-1">
+            <p-button icon="pi pi-paperclip" text (click)="onUploadFileClick()" />
+            <input type="file" #fileInput style="display: none;" (change)="onFileSelected($event)" />
+
+            <ng-container *ngIf="!isRecording; else recordingUI">
+                <textarea #userInput pTextarea
+                    class="ml-1 flex-1 border-0 shadow-none max-h-32 min-h-9 bg-emphasis overflow-auto" autoResize
+                    rows="1" placeholder="Write your message..." [(ngModel)]="currentMessageText"
+                    (keyup.enter)="sendMessage()"></textarea>
+            </ng-container>
+
+            <ng-template #recordingUI>
+                <div
+                    class="ml-1 flex-1 flex items-center gap-2 px-4 py-2 rounded-lg border border-orange-300 bg-orange-50 text-orange-600">
+                    <i class="pi pi-microphone animate-pulse"></i>
+                    <span class="text-sm font-medium">Recording... {{ formatRecordingTime(recordingTime) }}</span>
+                </div>
+            </ng-template>
+        </div>
+
+        <!-- Button dinamis tergantung state -->
+        <ng-container *ngIf="isRecording; else normalSend">
+            <p-button icon="pi pi-stop-circle" (click)="toggleRecording()" severity="danger" />
+        </ng-container>
+
+        <ng-template #normalSend>
+            <p-button [icon]="currentMessageText.trim().length > 0 ? 'pi pi-send' : 'pi pi-microphone'"
+                (click)="currentMessageText.trim().length > 0 ? sendMessage() : toggleRecording()" />
+        </ng-template>
+    </div>
+
+</div>
