@@ -2,6 +2,6 @@
 export const environment = {
     production: false,
     apiKey: 'TEST API KEY',
-    backendApiUrl: 'http://localhost:8001', // URL untuk generate IDs
-    websocketUrl: 'ws://localhost:8001/ws/chat', // URL untuk koneksi WebSocket
+    backendApiUrl: 'http://brins.localhost:8001', 
+    websocketUrl: 'ws://brins.localhost:8001/ws/chat',
   };

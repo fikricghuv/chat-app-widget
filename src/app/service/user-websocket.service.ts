@@ -77,7 +77,7 @@ export class WebSocketService
 
       this._socket.onclose = (event) => 
       {
-        console.warn(`⚠️ WebSocket ditutup: Code=${event.code}, Reason=${event.reason}, Clean=${event.wasClean}`, event);
+        console.warn(`⚠️ WebSocket user_id=${encodeURIComponent(id)}&role=${role} ditutup: Code=${event.code}, Reason=${event.reason}, Clean=${event.wasClean}`, event);
         this._statusSubject.next('disconnected'); 
         this._socket = undefined;
 

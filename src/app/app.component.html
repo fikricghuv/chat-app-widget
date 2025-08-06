@@ -1,7 +1,6 @@
-<div class="app-container">
+<div class="border-x border-surface flex flex-col h-full max-h-screen border-0">
   <ng-container *ngIf="_booleanIsAppInitialized; else loadingOrError">
       <chat-app></chat-app>
-       <!-- <button-rounded-demo></button-rounded-demo> -->
   </ng-container>
 
   <ng-template #loadingOrError>
