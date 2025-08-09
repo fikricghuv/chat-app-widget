@@ -1,12 +1,14 @@
-<div class="border-x border-surface flex flex-col h-full max-h-screen border-0" style="padding: 0px;">
+<div class="border-surface flex flex-col h-full max-h-screen border-0 flex-1 h-full overflow-y-auto overflow-x-clip overflow-hidden" style="padding: 0px; border-radius: 6px; height: 100vh;">
+    
     <!-- Header -->
     <div class="flex items-center p-4 gap-7 border-b border-surface sticky top-0 bg-surface-0 z-10 border-0">
         <div class="flex items-center">
-            <p-avatar image="/assets/just-logo.svg" styleClass="mr-2 av" size="medium" shape="circle" />
-            <div class="flex-1">
-                <div class="text-color leading-6 hover:text-muted-color-emphasis transition-colors text-base">
+            <p-avatar image="/assets/just-logo-color.svg" styleClass="mr-3 av" size="large" />
+            <div class="flex-1 ">
+                <div class="text-color text-base text-xl">
                     Vera Assistant
                 </div>
+                <span class="text-muted-color ">online</span>
             </div>
         </div>
     </div>
@@ -73,11 +75,7 @@
                         </span>
                     </div>
 
-                    <!-- Status Upload / Sent -->
                     <div class="flex items-center">
-                        <!-- <ng-container *ngIf="!message.fileUrl">
-                            <i class="pi pi-spinner pi-spin text-muted-color text-sm"></i>
-                        </ng-container> -->
                         <ng-container *ngIf="message.fileUrl">
                             <i class="pi pi-check-circle"
                                 [ngClass]="message.sender === _enumSender.User ? 'text-primary-contrast' : 'text-success'"></i>

@@ -39,10 +39,6 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
   ],
   templateUrl: 'chat.component.html',
   styleUrl: 'chat.component.scss',
-  host: {
-    class:
-      'flex-1 h-full overflow-y-auto overflow-x-clip overflow-hidden flex border border-surface rounded-2xl',
-  },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ChatComponent implements OnInit, OnDestroy {
