@@ -21,6 +21,7 @@ import { RoomConversationModel } from '../model/room.model';
 import { ChatCoreService } from '../service/user-chat-core.service'; 
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 
+
 @Component({
   selector: 'chat-app',
   standalone: true,
@@ -114,16 +115,14 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
     const messagesInView = this._objChatMessages[messageKey];
 
-    // Try to find an existing optimistic message to update
-    // Heuristic: if it's from user, doesn't have a server ID, and matches file/voice note name OR initial text
     let existingMsgIndex = -1;
-    if (newMessage.sender === ENUM_SENDER.User && newMessage.id) { // Server confirmation usually has an ID
+    if (newMessage.sender === ENUM_SENDER.User && newMessage.id) {
         existingMsgIndex = messagesInView.findIndex(m =>
             m.sender === ENUM_SENDER.User &&
-            !m.id && // Optimistic messages don't have server ID yet
+            !m.id && 
             (
-              (m.fileName && m.fileName === newMessage.fileName) || // Match by filename for files/voice
-              (!m.fileName && !newMessage.fileName && m.message === newMessage.message) // Basic match for text
+              (m.fileName && m.fileName === newMessage.fileName) || 
+              (!m.fileName && !newMessage.fileName && m.message === newMessage.message) 
             )
         );
     }
@@ -476,4 +475,27 @@ export class ChatComponent implements OnInit, OnDestroy {
       if (msg.fileUrl?.startsWith('blob:')) URL.revokeObjectURL(msg.fileUrl);
     });
   }
+
+  escapeHtml(text: string): string {
+    if (!text) return '';
+    return text.replace(/[&<>"'`=\/]/g, function (s) {
+      return ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '`': '&#x60;',
+        '=': '&#x3D;',
+        '/': '&#x2F;',
+      } as Record<string, string>)[s] || s;
+    });
+  }
+
+  formatMessageAsHtml(msg: string): string {
+    if (!msg) return '';
+    const escaped = this.escapeHtml(msg);
+    return escaped.replace(/\n/g, '<br>');
+  }
+
 }

@@ -4,6 +4,11 @@
   flex-direction: column;
 }
 
+.chat-bubble-text {
+  hyphens: auto;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
 
 .whatsapp-typing-indicator {
   display: flex;
