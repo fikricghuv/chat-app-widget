@@ -145,8 +145,8 @@
 
     <div class="p-4 border-t border-surface flex items-end justify-between gap-2 bg-surface-0">
         <div class="flex items-end gap-1 flex-1">
-            <p-button icon="pi pi-paperclip" text (click)="onUploadFileClick()" />
-            <input type="file" #fileInput style="display: none;" (change)="onFileSelected($event)" />
+            <!-- <p-button icon="pi pi-paperclip" text (click)="onUploadFileClick()" />
+            <input type="file" #fileInput style="display: none;" (change)="onFileSelected($event)" /> -->
 
             <ng-container *ngIf="!isRecording; else recordingUI">
                 <textarea #userInput pTextarea

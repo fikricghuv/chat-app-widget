@@ -494,8 +494,13 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   formatMessageAsHtml(msg: string): string {
     if (!msg) return '';
+    
     const escaped = this.escapeHtml(msg);
-    return escaped.replace(/\n/g, '<br>');
+
+    const withBold = escaped.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+    return withBold.replace(/\n/g, '<br>');
   }
+
 
 }

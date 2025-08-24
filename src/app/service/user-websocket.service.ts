@@ -9,10 +9,14 @@ export class WebSocketService
   private _socket?: WebSocket;
   private _messageSubject = new Subject<any>();
   private _statusSubject = new BehaviorSubject<string>('disconnected'); 
+  private _messageQueue: any[] = [];
 
   private _numberReconnectAttempts: number;
   private _numberMaxReconnectAttempts: number;
   private _reconnectTimeout: any; 
+
+  private _currentId: string = '';
+  private _currentRole: string = '';
 
   readonly status$ = this._statusSubject.asObservable();
 
@@ -29,6 +33,8 @@ export class WebSocketService
    */
   public connect(id: string, role: string): Promise<void> 
   {
+    this._currentId = id;
+    this._currentRole = role;
     return new Promise((resolve, reject) => 
     {
       if (this._socket && (this._socket.readyState === WebSocket.OPEN || this._socket.readyState === WebSocket.CONNECTING))
@@ -55,7 +61,7 @@ export class WebSocketService
           clearTimeout(this._reconnectTimeout);
           this._reconnectTimeout = null;
         }
-
+        this.processQueue(); 
         resolve();
       };
 
@@ -71,7 +77,7 @@ export class WebSocketService
         catch (e) 
         {
           console.error('❌ Gagal parse pesan JSON:', event.data, e);
-          alert("Gagal parse pesan JSON")
+          
         }
       };
 
@@ -159,9 +165,42 @@ export class WebSocketService
     {
       console.error('❌ WebSocket belum terhubung! Pesan gagal dikirim:', payload);
       
-      alert("WebSocket belum terhubung! Pesan gagal dikirim.");
-      
+      this._messageQueue.push(payload);
+        
+      if (this._currentId && this._currentRole) {
+          this.tryReconnect(this._currentId, this._currentRole);
+      } else {
+            console.error("❌ Gagal reconnect: ID atau Role tidak tersedia.");
+      }
     }
+  }
+
+  /**
+   * Mengirim semua pesan yang tersimpan dalam antrian
+   */
+  private processQueue(): void 
+  {
+      if (this._socket?.readyState === WebSocket.OPEN) 
+      {
+          while (this._messageQueue.length > 0) 
+          {
+              const payload = this._messageQueue.shift(); // Ambil dan hapus pesan pertama dari antrian
+              
+              try {
+                  this._socket.send(JSON.stringify(payload));
+                  console.log('✅ Pesan antrian terkirim:', payload);
+              } catch (e) {
+                  // Jika masih gagal kirim, kembalikan ke antrian (opsional, tergantung seberapa keras kita ingin mencoba)
+                  // this._messageQueue.unshift(payload); 
+                  console.error('❌ Gagal mengirim pesan dari antrian:', payload, e);
+                  break; // Berhenti memproses antrian jika ada kegagalan kirim
+              }
+          }
+          
+          if (this._messageQueue.length === 0) {
+              console.log("Antrian pesan berhasil dikosongkan.");
+          }
+      }
   }
 
   /**
