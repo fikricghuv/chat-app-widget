@@ -127,58 +127,76 @@ export class ChatCoreService implements OnDestroy {
     let senderEnum: ENUM_SENDER;
     if (serverData.from === ServerRole.User) {
         senderEnum = senderId === this._userId ? ENUM_SENDER.User : ENUM_SENDER.Chatbot; 
-    } else if (serverData.from === ServerRole.Admin || serverData.from === ServerRole.Chatbot) {
+    } else if (serverData.from === ServerRole.Admin) {
+        senderEnum = ENUM_SENDER.Admin;
+    } else if (serverData.from === ServerRole.Chatbot) {
         senderEnum = ENUM_SENDER.Chatbot;
     } else {
         senderEnum = senderId === this._userId ? ENUM_SENDER.User : ENUM_SENDER.Chatbot;
     }
 
-    if (serverData.success === true || serverData.type === 'new_message' || serverData.type === 'message_ack') { 
-        const messageType = serverData.message_type;
-        const messageId = serverData.message_id || `srv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-        const timestamp = serverData.timestamp || new Date().toISOString();
-        const caption = serverData.caption || serverData.message;
+    // normalize dulu semua variasi message
+    const normalized = this.normalizeMessage(serverData);
+    const messageId = serverData.message_id || `srv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const timestamp = serverData.timestamp || new Date().toISOString();
 
-        if (messageType === 'voice_note' && serverData.audio_url) {
-            processedMessage = {
-                id: messageId, sender: senderEnum, time: timestamp, isVoiceNote: true,
-                audioUrl: serverData.audio_url, fileName: serverData.file_name,
-                fileType: serverData.mime_type, audioDuration: this.formatDurationFromServer(serverData.duration),
-                message: caption,
-            };
-            stopLoading = true;
-        } else if (messageType === 'file' && serverData.file_url) {
-            processedMessage = {
-                id: messageId, sender: senderEnum, time: timestamp,
-                fileUrl: serverData.file_url, fileName: serverData.file_name,
-                fileType: serverData.mime_type,
-                message: caption,
-            };
-            stopLoading = true;
-        } else if (serverData.data && typeof serverData.data === 'string') { 
-            processedMessage = {
-                id: messageId, sender: senderEnum, time: timestamp,
-                message: serverData.data.trim(),
-            };
-            stopLoading = true;
-        } else if (serverData.message && typeof serverData.message === 'string' && !messageType) { 
-             processedMessage = {
-                id: messageId, sender: senderEnum, time: timestamp,
-                message: serverData.message.trim(),
-            };
-            stopLoading = true;
-        } else if (serverData.success === true && senderEnum === ENUM_SENDER.User) {
-            stopLoading = true;
-        }
-
-    } else if (serverData.type === 'error' && serverData.error) {
-        processedMessage = { id:`err-${Date.now()}`, sender: ENUM_SENDER.Chatbot, message: `Error: ${serverData.error}`, time: new Date().toISOString() };
+    if (normalized.text) {
+        processedMessage = {
+            id: messageId,
+            sender: senderEnum,
+            time: timestamp,
+            message: normalized.text.trim(),
+            room_id: serverData.room_id
+        };
         stopLoading = true;
-    } else if (serverData.type === 'info' && serverData.message) {
-        processedMessage = { id:`info-${Date.now()}`, sender: ENUM_SENDER.Chatbot, message: `[INFO] ${serverData.message}`, time: new Date().toISOString() };
-    } else if (["room_message", "chat_history", "active_rooms_update"].includes(serverData.type)) {
-        
-    } else {
+    } 
+    else if (serverData.message_type === 'voice_note' && serverData.audio_url) {
+        processedMessage = {
+            id: messageId,
+            sender: senderEnum,
+            time: timestamp,
+            isVoiceNote: true,
+            audioUrl: serverData.audio_url,
+            fileName: serverData.file_name,
+            fileType: serverData.mime_type,
+            audioDuration: this.formatDurationFromServer(serverData.duration),
+            message: serverData.caption || ''
+        };
+        stopLoading = true;
+    } 
+    else if (serverData.message_type === 'file' && serverData.file_url) {
+        processedMessage = {
+            id: messageId,
+            sender: senderEnum,
+            time: timestamp,
+            fileUrl: serverData.file_url,
+            fileName: serverData.file_name,
+            fileType: serverData.mime_type,
+            message: serverData.caption || ''
+        };
+        stopLoading = true;
+    } 
+    else if (serverData.type === 'error' && serverData.error) {
+        processedMessage = {
+            id:`err-${Date.now()}`,
+            sender: ENUM_SENDER.Chatbot,
+            message: `Error: ${serverData.error}`,
+            time: new Date().toISOString()
+        };
+        stopLoading = true;
+    } 
+    else if (serverData.type === 'info' && serverData.message) {
+        processedMessage = {
+            id:`info-${Date.now()}`,
+            sender: ENUM_SENDER.Chatbot,
+            message: `[INFO] ${serverData.message}`,
+            time: new Date().toISOString()
+        };
+    } 
+    else if (["room_message", "chat_history", "active_rooms_update"].includes(serverData.type)) {
+        // skip
+    } 
+    else {
         console.warn('ChatCoreService: Unhandled WS message format:', serverData);
     }
 
@@ -189,6 +207,17 @@ export class ChatCoreService implements OnDestroy {
         this._isLoadingSending.next(false);
     }
   }
+
+  /**
+   * Normalize semua variasi payload menjadi { text, type }
+   */
+  private normalizeMessage(serverData: any): { text?: string; type?: string } {
+    if (serverData.message && typeof serverData.message === 'string') {
+      return { text: serverData.message, type: serverData.type || 'message' };
+    }
+    return {};
+  }
+
 
   private formatDurationFromServer(totalSeconds?: number): string | undefined {
     if (totalSeconds === undefined || totalSeconds === null || isNaN(totalSeconds)) return undefined;

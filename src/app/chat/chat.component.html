@@ -34,9 +34,14 @@
             </div>
 
             <!-- Bubble Content -->
-            <div [ngClass]="message.sender !== _enumSender.User
-            ? 'flex-1 bg-surface-100 dark:bg-surface-800 px-3 py-2 rounded-xl'
-            : 'flex-1 bg-primary px-3 py-2 rounded-xl text-primary-contrast'" class="flex flex-col gap-1">
+            <div
+                [ngClass]="
+                    message.sender !== _enumSender.User
+                    ? 'inline-block bg-surface-100 dark:bg-surface-800 px-3 py-2 rounded-xl'
+                    : 'inline-block bg-primary px-3 py-2 rounded-xl text-primary-contrast'
+                "
+                class="flex flex-col gap-1 max-w-[80%] min-w-[48px] break-words w-auto"
+            >
 
                 <!-- TEXT -->
                 <p *ngIf="!message.fileName && !message.isVoiceNote && message.message"
@@ -124,23 +129,24 @@
         </div>
 
         <!-- Typing Loading -->
-        <div *ngIf="(chatCoreService.isLoadingSending$ | async)" class="flex items-start min-w-64 w-fit max-w-[30%]">
+        <div *ngIf="(chatCoreService.isLoadingSending$ | async)" class="flex items-start w-fit max-w-[30%]">
             <div class="flex items-center gap-2">
                 <img src="/assets/agent.png" alt="Agent Avatar" class="w-10 h-10 rounded-full" />
                 <svg class="fill-surface-100 dark:fill-surface-800" xmlns="http://www.w3.org/2000/svg" width="7"
-                    height="11" viewBox="0 0 7 11" fill="none">
-                    <path
-                        d="M1.79256 7.09551C0.516424 6.31565 0.516426 4.46224 1.79256 3.68238L7 0.500055L7 10.2778L1.79256 7.09551Z" />
+                height="11" viewBox="0 0 7 11" fill="none">
+                <path
+                    d="M1.79256 7.09551C0.516424 6.31565 0.516426 4.46224 1.79256 3.68238L7 0.500055L7 10.2778L1.79256 7.09551Z" />
                 </svg>
             </div>
-            <div class="flex-1 bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded-lg">
+            <div class="bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded-lg w-fit">
                 <div class="whatsapp-typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
                 </div>
             </div>
         </div>
+
     </div>
 
     <div class="p-4 border-t border-surface flex items-end justify-between gap-2 bg-surface-0">
