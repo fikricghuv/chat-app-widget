@@ -228,49 +228,49 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  onUploadFileClick(): void {
-    if (this.isRecording) return;
-    this.fileInput.nativeElement.click();
-  }
+  // onUploadFileClick(): void {
+  //   if (this.isRecording) return;
+  //   this.fileInput.nativeElement.click();
+  // }
 
-  onFileSelected(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file || !this._stringUserId) return;
+  // onFileSelected(event: Event): void {
+  //   const file = (event.target as HTMLInputElement).files?.[0];
+  //   if (!file || !this._stringUserId) return;
 
-    const tempFileUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
-    const optimisticMessage: MessageModel = {
-      sender: ENUM_SENDER.User,
-      message: `Uploading: ${file.name}...`,
-      time: new Date().toISOString(),
-      fileName: file.name,
-      fileType: file.type,
-      fileUrl: tempFileUrl,
-    };
-    this.addOptimisticMessageToUI(optimisticMessage);
+  //   const tempFileUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
+  //   const optimisticMessage: MessageModel = {
+  //     sender: ENUM_SENDER.User,
+  //     message: `Uploading: ${file.name}...`,
+  //     time: new Date().toISOString(),
+  //     fileName: file.name,
+  //     fileType: file.type,
+  //     fileUrl: tempFileUrl,
+  //   };
+  //   this.addOptimisticMessageToUI(optimisticMessage);
 
-    this.chatCoreService.sendFile(file)
-      .catch(error => {
-        console.error('Playground: Failed to send file:', error);
-        this.updateOptimisticMessageStatusOnError(file.name, `Failed to upload "${file.name}"`);
-        if (tempFileUrl) URL.revokeObjectURL(tempFileUrl);
-      });
-    this.fileInput.nativeElement.value = ''; // Reset input
-  }
+  //   this.chatCoreService.sendFile(file)
+  //     .catch(error => {
+  //       console.error('Playground: Failed to send file:', error);
+  //       this.updateOptimisticMessageStatusOnError(file.name, `Failed to upload "${file.name}"`);
+  //       if (tempFileUrl) URL.revokeObjectURL(tempFileUrl);
+  //     });
+  //   this.fileInput.nativeElement.value = ''; // Reset input
+  // }
 
-  formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-    return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-  }
+  // formatFileSize(bytes: number): string {
+  //   if (bytes < 1024) return `${bytes} B`;
+  //   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  //   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  //   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+  // }
 
-  truncateMiddle(text: string, maxLength: number = 10): string {
-    if (!text || text.length <= maxLength) return text;
+  // truncateMiddle(text: string, maxLength: number = 10): string {
+  //   if (!text || text.length <= maxLength) return text;
 
-    const start = Math.ceil(maxLength / 2);
-    const end = Math.floor(maxLength / 2) - 1;
-    return text.substring(0, start) + '...' + text.substring(text.length - end);
-  }
+  //   const start = Math.ceil(maxLength / 2);
+  //   const end = Math.floor(maxLength / 2) - 1;
+  //   return text.substring(0, start) + '...' + text.substring(text.length - end);
+  // }
 
   async toggleRecording(): Promise<void> {
     if (this.isRecording) {
@@ -502,5 +502,52 @@ export class ChatComponent implements OnInit, OnDestroy {
     return withBold.replace(/\n/g, '<br>');
   }
 
+  ngAfterViewInit() {
+    if (this.chatScroll?.nativeElement) {
+      this.chatScroll.nativeElement.addEventListener('scroll', this.onScroll.bind(this));
+    }
+  }
+
+  private onScroll(): void {
+    const el = this.chatScroll.nativeElement;
+    if (el.scrollTop === 0 && !this.isLoadingHistory && this.chatCoreService.hasMoreHistory) {
+      this.loadOlderMessages();
+    }
+  }
+
+  private loadOlderMessages(): void {
+    if (!this._stringUserId) return;
+
+    this.isLoadingHistory = true;
+    const prevScrollHeight = this.chatScroll.nativeElement.scrollHeight;
+
+    this.chatCoreService.loadMoreHistory()
+      .pipe(
+        takeUntil(this.destroy$),
+        finalize(() => {
+          this.isLoadingHistory = false;
+          this.cdr.detectChanges();
+        })
+      )
+      .subscribe({
+        next: olderMessages => {
+          if (olderMessages.length && this._stringUserId) {
+            this._objChatMessages[this._stringUserId] = [
+              ...olderMessages,
+              ...(this._objChatMessages[this._stringUserId] || [])
+            ];
+            this.updateFilteredMessages();
+
+            // Jaga posisi scroll supaya tidak "lompat"
+            setTimeout(() => {
+              const newScrollHeight = this.chatScroll.nativeElement.scrollHeight;
+              this.chatScroll.nativeElement.scrollTop =
+                newScrollHeight - prevScrollHeight;
+            }, 50);
+          }
+        },
+        error: err => console.error('Playground: Error loading older history:', err)
+      });
+  }
 
 }
