@@ -1,6 +1,6 @@
 // src/app/services/chat-core.service.ts
 import { Injectable, OnDestroy } from '@angular/core';
-import { Subject, Observable, BehaviorSubject, throwError } from 'rxjs';
+import { Subject, Observable, BehaviorSubject, throwError, of } from 'rxjs';
 import { takeUntil, filter, map, catchError, finalize, take } from 'rxjs/operators';
 import { WebSocketService } from './user-websocket.service'; 
 import { ChatHistoryService } from './chat-history.service'; 
@@ -24,6 +24,9 @@ export class ChatCoreService implements OnDestroy {
   public readonly isLoadingSending$ = this._isLoadingSending.asObservable();
 
   public readonly wsConnectionStatus$: Observable<string>;
+
+  private _nextCursor: string | null = null;
+  private _hasMoreHistory = true;
 
   constructor(
     private wsService: WebSocketService,
@@ -68,6 +71,10 @@ export class ChatCoreService implements OnDestroy {
     this.wsService.sendMessage(payload);
   }
 
+  get hasMoreHistory(): boolean {
+    return this._hasMoreHistory;
+  }
+
   private readFileAsBase64(fileOrBlob: File | Blob): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -83,23 +90,23 @@ export class ChatCoreService implements OnDestroy {
     });
   }
 
-  sendFile(file: File): Promise<void> {
-    if (!this._userId) return Promise.reject('User ID not set.');
-    this._isLoadingSending.next(true);
+  // sendFile(file: File): Promise<void> {
+  //   if (!this._userId) return Promise.reject('User ID not set.');
+  //   this._isLoadingSending.next(true);
 
-    return this.readFileAsBase64(file).then(base64Data => {
-      const payload = {
-        type: 'file', user_id: this._userId!, role: ServerRole.User,
-        file_name: file.name, file_type: file.type, file_size: file.size, file_data: base64Data,
-      };
-      this.wsService.sendMessage(payload);
-    }).catch(err => {
-      console.error('ChatCoreService Error sending file:', err);
-      throw err; 
-    }).finally(() => {
-      this._isLoadingSending.next(false);
-    });
-  }
+  //   return this.readFileAsBase64(file).then(base64Data => {
+  //     const payload = {
+  //       type: 'file', user_id: this._userId!, role: ServerRole.User,
+  //       file_name: file.name, file_type: file.type, file_size: file.size, file_data: base64Data,
+  //     };
+  //     this.wsService.sendMessage(payload);
+  //   }).catch(err => {
+  //     console.error('ChatCoreService Error sending file:', err);
+  //     throw err; 
+  //   }).finally(() => {
+  //     this._isLoadingSending.next(false);
+  //   });
+  // }
 
   sendVoiceNote(audioBlob: Blob, fileName: string, mimeType: string, durationSeconds: number): Promise<void> {
     if (!this._userId) return Promise.reject('User ID not set.');
@@ -135,7 +142,6 @@ export class ChatCoreService implements OnDestroy {
         senderEnum = senderId === this._userId ? ENUM_SENDER.User : ENUM_SENDER.Chatbot;
     }
 
-    // normalize dulu semua variasi message
     const normalized = this.normalizeMessage(serverData);
     const messageId = serverData.message_id || `srv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
     const timestamp = serverData.timestamp || new Date().toISOString();
@@ -176,11 +182,12 @@ export class ChatCoreService implements OnDestroy {
         };
         stopLoading = true;
     } 
-    else if (serverData.type === 'error' && serverData.error) {
+    else if ((serverData.type === 'error' && serverData.error) || 
+         (serverData.success === false && serverData.error)) {
         processedMessage = {
             id:`err-${Date.now()}`,
             sender: ENUM_SENDER.Chatbot,
-            message: `Error: ${serverData.error}`,
+            message: "Maaf sedang terjadi kesalahan, coba lagi nanti.",
             time: new Date().toISOString()
         };
         stopLoading = true;
@@ -198,6 +205,7 @@ export class ChatCoreService implements OnDestroy {
     } 
     else {
         console.warn('ChatCoreService: Unhandled WS message format:', serverData);
+        stopLoading = true;
     }
 
     if (processedMessage) {
@@ -218,7 +226,6 @@ export class ChatCoreService implements OnDestroy {
     return {};
   }
 
-
   private formatDurationFromServer(totalSeconds?: number): string | undefined {
     if (totalSeconds === undefined || totalSeconds === null || isNaN(totalSeconds)) return undefined;
     const minutes = Math.floor(totalSeconds / 60);
@@ -226,43 +233,51 @@ export class ChatCoreService implements OnDestroy {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
 
-  loadHistory(): Observable<MessageModel[]> {
+  loadHistory(limit: number = 20, cursor: string | null = null): Observable<MessageModel[]> {
     if (!this._userId) return throwError(() => new Error("User ID not set for history load"));
 
-    return this.historyService.loadChatHistory(this._userId).pipe(
+    return this.historyService.loadChatHistory(this._userId, cursor, limit).pipe(
       map((response: UserHistoryResponseModel): MessageModel[] => {
         if (!response?.history?.length) {
+          this._hasMoreHistory = false;
           return [];
         }
 
-        return response.history
-          .sort((a, b) => (new Date(a.created_at).getTime()) - (new Date(b.created_at).getTime()))
-          .map((historyItem: ChatHistoryResponseModel): MessageModel | null => {
-            let senderType: ENUM_SENDER;
-            if (historyItem.role === ServerRole.User) {
-              senderType = ENUM_SENDER.User;
-            } else if (historyItem.role === ServerRole.Admin || historyItem.role === ServerRole.Chatbot) {
-              senderType = ENUM_SENDER.Chatbot;
-            } else {
-              senderType = ENUM_SENDER.Chatbot;
-            }
+        this._nextCursor = response.next_cursor;
+        this._hasMoreHistory = !!response.next_cursor;
 
-            const message: MessageModel = {
-              id: historyItem.id || `hist-${historyItem.created_at}`,
-              sender: senderType,
-              message: historyItem.message, 
-              time: historyItem.created_at, 
-              room_id: historyItem.room_conversation_id,
-            };
-
-            return message;
-          }).filter(msg => msg !== null && (msg.message !== undefined && msg.message.trim() !== '')) as MessageModel[]; 
+        return this.mapHistoryResponse(response.history);
       }),
       catchError(err => {
         console.error('ChatCoreService: Failed to load/map history:', err);
         return throwError(() => new Error('Failed to load chat history'));
       })
     );
+  }
+
+
+  private mapHistoryResponse(history: ChatHistoryResponseModel[]): MessageModel[] {
+    return history
+      .sort((a, b) => (new Date(a.created_at).getTime()) - (new Date(b.created_at).getTime()))
+      .map((historyItem: ChatHistoryResponseModel): MessageModel | null => {
+        let senderType: ENUM_SENDER;
+        if (historyItem.role === ServerRole.User) {
+          senderType = ENUM_SENDER.User;
+        } else if (historyItem.role === ServerRole.Admin || historyItem.role === ServerRole.Chatbot) {
+          senderType = ENUM_SENDER.Chatbot;
+        } else {
+          senderType = ENUM_SENDER.Chatbot;
+        }
+
+        return {
+          id: historyItem.id || `hist-${historyItem.created_at}`,
+          sender: senderType,
+          message: historyItem.message,
+          time: historyItem.created_at,
+          room_id: historyItem.room_conversation_id,
+        };
+      })
+      .filter(msg => msg !== null && msg.message.trim() !== '') as MessageModel[];
   }
 
   ngOnDestroy(): void {
@@ -274,4 +289,12 @@ export class ChatCoreService implements OnDestroy {
     this._incomingMessages.complete();
     this._isLoadingSending.complete();
   }
+
+  loadMoreHistory(limit: number = 20): Observable<MessageModel[]> {
+    if (!this._hasMoreHistory || !this._nextCursor) {
+      return of([]); 
+    }
+    return this.loadHistory(limit, this._nextCursor);
+  }
+
 }

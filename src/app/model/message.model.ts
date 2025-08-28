@@ -15,3 +15,9 @@ export interface MessageModel {
   audioUrl?: string;       
   audioDuration?: string;   
 }
+
+export interface ChatHistoryResponse {
+  history: MessageModel[];
+  nextCursor: string | null;
+  total: number;
+}
